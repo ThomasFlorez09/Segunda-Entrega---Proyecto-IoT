@@ -4,7 +4,6 @@ import time
 import random
 import threading
 
-# --- CLASE PIDController (Sin cambios) ---
 class PIDController:
     def _init_(self, Kp, Ki, Kd):
         self.Kp = Kp
@@ -26,7 +25,6 @@ class PIDController:
         self.prev_error = error
         return smoothed_output
 
-# --- CLASE LineFollowerCar ---
 class LineFollowerCar:
     def _init_(self, canvas, stops_list):
         self.canvas = canvas
@@ -44,8 +42,7 @@ class LineFollowerCar:
         self.sensor_distance = 30
         self.sensor_offset = 20
         self.pid = PIDController(2.0, 0.00001, 0.00002)
-        # Inicializar last_time AHORA
-        self.last_time = time.time() # <<< Asegurarse de inicializarlo aquí
+        self.last_time = time.time()
         self.trail = []
         self.last_angle_change = 0
         self.max_turn_rate = 3.5
@@ -63,7 +60,6 @@ class LineFollowerCar:
         self.sensor_right = self.create_sensor()
         self.update_car()
 
-    # --- (create_car_body, create_wheel, create_sensor, update_car, _update_wheel, get_sensor_positions sin cambios) ---
     def create_car_body(self):
         return self.canvas.create_polygon([0,0, 30,0, 30,20, 0,20], fill='#2E86C1', outline='#1B4F72', width=2)
 
@@ -120,25 +116,16 @@ class LineFollowerCar:
         sensor_right_y = front_y - self.sensor_offset * cos_a
         return (sensor_left_x, sensor_left_y), (sensor_right_x, sensor_right_y)
 
-
-    # --- MODIFICACIÓN AQUÍ ---
     def wait_for_station_confirmation_thread(self):
-        input() # Espera Enter en la consola
+        input()
         print(f"--- Continuando desde Parada {self.current_stop_index + 1}... ---")
-
-        # <<< ¡¡¡ LA CLAVE ESTÁ AQUÍ !!! >>>
-        # Reseteamos last_time al tiempo actual ANTES de permitir que move() se ejecute de nuevo.
         self.last_time = time.time()
-
-        # Ahora reseteamos los flags para permitir el movimiento
         self.is_stopped_at_station = False
         self.waiting_for_station_confirmation = False
         if self.stop_message_id:
             self.canvas.delete(self.stop_message_id)
             self.stop_message_id = None
 
-
-    # --- (check_proximity_to_stops sin cambios lógicos) ---
     def check_proximity_to_stops(self):
         if self.waiting_for_station_confirmation:
             return True
@@ -149,7 +136,7 @@ class LineFollowerCar:
                 self.is_stopped_at_station = True
                 self.waiting_for_station_confirmation = True
                 self.current_stop_index = i
-                self.speed = 0 # Detener velocidad VISUAL
+                self.speed = 0
 
                 print(f"\n=== Coche en Parada {i+1} ({stop_coord[0]}, {stop_coord[1]}) ===")
                 print(">>> Presiona Enter en esta consola para continuar <<<")
@@ -169,24 +156,16 @@ class LineFollowerCar:
                 return True
         return False
 
-
-    # --- MODIFICACIÓN AQUÍ ---
     def move(self):
         if self.check_proximity_to_stops():
              self.update_car()
              return
 
         now = time.time()
-        dt = now - self.last_time if now > self.last_time else 1e-3 # Calcular dt normal
-
-        # <<< LIMITAR DT MÁXIMO >>>
-        # Limita el paso de tiempo máximo a, por ejemplo, 0.1 segundos (100ms)
-        # Esto previene saltos enormes si el bucle se retrasa mucho por cualquier razón.
+        dt = now - self.last_time if now > self.last_time else 1e-3
         dt = min(dt, 0.1)
+        self.last_time = now
 
-        self.last_time = now # Actualizar last_time para el próximo ciclo
-
-        # --- Resto de la lógica de move sin cambios ---
         sl, sr = self.get_sensor_positions()
         sc = ((sl[0]+sr[0])/2, (sl[1]+sr[1])/2)
 
@@ -211,12 +190,11 @@ class LineFollowerCar:
             elif state == 'left': self.speed = base_speed * 0.7; error = 3.0
             elif state == 'right': self.speed = base_speed * 0.7; error = -3.0
 
-            steering = self.pid.compute(error, dt) # PID usa el dt (ahora limitado)
+            steering = self.pid.compute(error, dt)
             steering = max(-self.max_turn_rate, min(steering, self.max_turn_rate))
             self.car_angle += steering
 
         rad = math.radians(self.car_angle)
-        # El movimiento usa el dt (ahora limitado)
         move_dist = self.speed * dt * 60
         self.car_x += move_dist * math.cos(rad)
         self.car_y += move_dist * math.sin(rad)
@@ -228,7 +206,6 @@ class LineFollowerCar:
         if len(self.trail) > 150: self.trail.pop(0)
         self.update_car()
 
-
     def check_sensor(self, x, y):
         global guide_line
         sensor_check_radius = 4
@@ -236,20 +213,18 @@ class LineFollowerCar:
                                                x + sensor_check_radius, y + sensor_check_radius)
         return guide_line in overlap
 
-
-# --- Funciones Auxiliares y Configuración Global (sin cambios) ---
 def create_track_path(stop_points_for_line):
     pts = []
     pts.extend(stop_points_for_line)
     return [coord for pt in pts for coord in pt]
 
 window = tk.Tk()
-window.title("Seguidor de Línea con Paradas (Fix Teleport)")
+window.title("Seguidor de Línea con Paradas")
 canvas = tk.Canvas(window, width=800, height=600, bg='#EAEAEA')
 canvas.pack()
 
 stops_unique_coords = [
-    (200, 500), (350, 150), (650, 150), (700, 400), (400, 550),
+    (200, 450), (350, 150), (650, 150), (700, 400), (400, 550),
 ]
 stops_for_line_drawing = stops_unique_coords + [stops_unique_coords[0]]
 
@@ -279,7 +254,7 @@ canvas.create_text(400, 30, text="Seguidor de Línea - Pista Irregular", font=("
 
 def game_loop():
     if not car.waiting_for_station_confirmation:
-        car.move() # move ahora calcula dt correctamente después de pausa
+        car.move()
         if random.random() > 0.7:
              if car.trail:
                 last_pos = car.trail[-1]
